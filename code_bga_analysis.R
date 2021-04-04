@@ -1,9 +1,9 @@
 #-----------------
 #
 # BGA analyses
-# 09.12.2020
+# 04.04.2021
 # JV
-# jomivi(at)utu.fi
+# joni.virta(at)utu.fi
 #
 #-----------------
 
@@ -31,7 +31,6 @@ my_folder <- "/folder/subfolder"
 
 
 
-
 # Read Bga and Temp and preprocess by
 # - dividing into two depth ranges (< 20, >= 20)
 # - taking averages over days
@@ -40,14 +39,14 @@ bga <- NULL
 
 for(i in 2015:2019){
   bga_temp <- read.csv(paste0(my_folder, "/bga_", i, ".csv")) %>%
-    select(-type) %>%
+    dplyr::select(-type) %>%
     mutate(depth = if_else(depth < 20, 1, 2)) %>%
     mutate(date = as.Date(substr(date, 1, 10))) %>%
     group_by(date, depth) %>%
     summarise(bga = mean(value, na.rm = TRUE)) %>%
     ungroup() %>%
     mutate(year = year(date), day = yday(date)) %>%
-    select(year, day, depth, bga)
+    dplyr::select(year, day, depth, bga)
   
   bga <- bga %>%
     bind_rows(bga_temp)
@@ -62,14 +61,14 @@ temp <- NULL
 
 for(i in 2015:2019){
   temp_temp <- read.csv(paste0(my_folder, "/temperature_", i, ".csv")) %>%
-    select(-type) %>%
+    dplyr::select(-type) %>%
     mutate(depth = if_else(depth < 20, 1, 2)) %>%
     mutate(date = as.Date(substr(date, 1, 10))) %>%
     group_by(date, depth) %>%
     summarise(temp = mean(value, na.rm = TRUE)) %>%
     ungroup() %>%
     mutate(year = year(date), day = yday(date)) %>%
-    select(year, day, depth, temp)
+    dplyr::select(year, day, depth, temp)
   
   temp <- temp %>%
     bind_rows(temp_temp)
@@ -80,11 +79,11 @@ for(i in 2015:2019){
 # Remove the bottom depth category (the interesting thing are at the surface)
 bga <- bga %>%
   filter(depth == 1) %>%
-  select(-depth)
+  dplyr::select(-depth)
 
 temp <- temp %>%
   filter(depth == 1) %>%
-  select(-depth)
+  dplyr::select(-depth)
 
 
 
@@ -94,7 +93,7 @@ wind <- NULL
 
 # 2015
 wind_temp <- read.csv(paste0(my_folder, "/weather_", 2015, ".csv"), sep = ";") %>%
-  select(Date, Wspeed) %>%
+  dplyr::select(Date, Wspeed) %>%
   mutate(Wspeed = gsub(",", ".", Wspeed)) %>%
   mutate(Wspeed = as.numeric(Wspeed)) %>%
   mutate(Date = as.Date(Date, format = "%d.%m.%Y")) %>%
@@ -102,7 +101,7 @@ wind_temp <- read.csv(paste0(my_folder, "/weather_", 2015, ".csv"), sep = ";") %
   group_by(year, day) %>%
   summarize(wind = mean(Wspeed, na.rm = TRUE)) %>%
   ungroup() %>%
-  select(year, day, wind)
+  dplyr::select(year, day, wind)
 
 wind <- wind %>%
   bind_rows(wind_temp)
@@ -118,7 +117,7 @@ wind_temp <- wind_temp %>%
   group_by(year, day) %>%
   summarize(wind = mean(Wspeed, na.rm = TRUE)) %>%
   ungroup() %>%
-  select(year, day, wind)
+  dplyr::select(year, day, wind)
 
 
 wind <- wind %>%
@@ -136,7 +135,7 @@ wind_temp <- wind_temp %>%
   group_by(year, day) %>%
   summarize(wind = mean(Wspeed, na.rm = TRUE)) %>%
   ungroup() %>%
-  select(year, day, wind)
+  dplyr::select(year, day, wind)
 
 
 wind <- wind %>%
@@ -146,7 +145,7 @@ wind <- wind %>%
 
 # 2018 & 2019
 wind_temp <- read.csv(paste0(my_folder, "/weather_2018_2019", ".csv"), sep = ",") %>%
-  select(date, wind_speed) %>%
+  dplyr::select(date, wind_speed) %>%
   mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
   mutate(wind_speed = as.character(wind_speed)) %>%
   mutate(wind_speed = ifelse(wind_speed == "NULL", NA, wind_speed)) %>%
@@ -155,7 +154,7 @@ wind_temp <- read.csv(paste0(my_folder, "/weather_2018_2019", ".csv"), sep = ","
   group_by(year, day) %>%
   summarize(wind = mean(wind_speed, na.rm = TRUE)) %>%
   ungroup() %>%
-  select(year, day, wind)
+  dplyr::select(year, day, wind)
 
 wind <- wind %>%
   bind_rows(wind_temp)
@@ -174,20 +173,21 @@ seili <- full_join(seili, wind, by = c("year", "day"))
 
 
 
+
 # Estimate the bottom level for 2018
 
 seili %>%
   filter(year != 2018) %>%
-  select(year, bga) %>%
+  dplyr::select(year, bga) %>%
   group_by(year) %>%
   summarise(min_bga = min(bga, na.rm = TRUE)) %>%
   ungroup() %>%
-  select(min_bga) %>%
+  dplyr::select(min_bga) %>%
   summarize(avg_min_bga = mean(min_bga))
 
 seili %>%
   filter(year == 2018) %>%
-  select(bga) %>%
+  dplyr::select(bga) %>%
   summarize(min_bga = min(bga, na.rm = TRUE))
 
 seili_adjust <- seili %>%
@@ -236,11 +236,11 @@ dev.off()
 
 
 
-##### Prediction with "Difference-day model" (not in the paper)
+##### Prediction with "Difference-day model"
 
 
 seili_work_diff <- seili_offset %>%
-  select(day, bga, temp, wind, year) %>%
+  dplyr::select(day, bga, temp, wind, year) %>%
   arrange(year, day) %>%
   group_by(year) %>%
   mutate(bga_diff = bga - lag(bga)) %>%
@@ -263,7 +263,7 @@ seili_2019_diff <- seili_work_diff %>%
 
 day_list <- seili_2019_diff %>%
   arrange(year, day) %>%
-  select(day) %>%
+  dplyr::select(day) %>%
   c()
 
 day_list <- day_list$day
@@ -271,12 +271,11 @@ day_list <- day_list$day
 day_list
 
 
-
 ##### 10 days ahead
 
-init_days <- 44
+init_days <- 49
 incr_days <- 10
-k_max <- 200/incr_days
+k_max <- 150/incr_days
 
 start_days <- day_list[seq(init_days + 1, by = incr_days, length.out = k_max)]
 
@@ -296,6 +295,12 @@ for(k in 1:k_max){
                  random = list(year = ~1), data = seili_model_diff, family = gaussian(link = identity), method = "REML", niterPQL = 100)
 
   preds <- predict(gamm_1$gam, seili_test_diff, se.fit = TRUE)
+  
+  # Add the random effects manually
+  ref_year <- ranef(gamm_1$lme, level = 4)
+  rownames(ref_year) <- substr(rownames(ref_year), start = 7, stop = 10)
+  
+  preds$fit <- preds$fit + ref_year["2019", 1]
   
   # gam_1 <- gam(chl_diff ~ s(temp, by = depth) + s(day, by = depth) + depth + year,
   #                data = seili_model_diff, family = gaussian(link = identity))
@@ -342,29 +347,37 @@ for(k in 1:k_max){
 
 
 seili_res_diff_2 <- seili_res_diff %>%
-  mutate(window_between = rep(1:k_max, each = incr_days)[1:200],
-         window_within = rep(1:incr_days, k_max)[1:200]) %>%
+  mutate(window_between = rep(1:k_max, each = incr_days),
+         window_within = rep(1:incr_days, k_max)) %>%
   mutate(bga_sum = ifelse(window_within == 1, bga, bga_diff_pred)) %>%
   group_by(window_between) %>%
   mutate(bga_diff_pred_cumsum = cumsum(bga_sum)) %>%
   ungroup(window_between) %>%
-  select(day, year, bga, bga_diff_pred_cumsum) %>%
+  dplyr::select(day, year, bga, bga_diff_pred_cumsum) %>%
   rename(bga_pred = bga_diff_pred_cumsum)
+
+
 
 seili_res_diff_3 <- seili_res_diff_2 %>%
   gather(key = type, value = value, -day, -year,) %>%
   mutate(type = factor(type, levels = c("bga", "bga_pred"), labels = c("True", "Predicted")))
 
-seili_final_diff <- seili_2019_diff %>%
-  filter(day < 15) %>%
-  select(-temp, -wind, -bga_diff) %>%
+
+seili_final_diff <- seili_offset %>%
+  filter(year == "2019") %>%
+  filter(day < 43) %>%
+  dplyr::select(day, bga, year) %>%
+  mutate(year = as.factor(year)) %>%
   rename(value = bga) %>%
   mutate(type = "bga") %>%
   mutate(type = factor(type, levels = c("bga", "bga_pred"), labels = c("True", "Predicted"))) %>%
-  select(day, year, type, value) %>%
+  dplyr::select(day, year, type, value) %>%
   bind_rows(seili_res_diff_3)
 
-pdf(paste0(my_folder, "/plot_predict_bga_temp_wind.pdf"), width = 10, height = 5)
+
+
+
+pdf(paste0(my_folder, "/Revision_plots/Fig6B_difference_day.pdf"), width = 10, height = 5)
 ggplot(seili_final_diff, aes(x = day)) +
   geom_line(aes(y = value, linetype = type)) +
   theme_bw() +
@@ -400,12 +413,6 @@ for(k in 1:k_max){
   
   preds <- predict(gamm_1$gam, seili_test_diff, se.fit = TRUE)
   
-  # gam_1 <- gam(chl_diff ~ s(temp, by = depth) + s(day, by = depth) + depth + year,
-  #                data = seili_model_diff, family = gaussian(link = identity))
-  # 
-  # preds <- predict(gam_1, seili_test_diff, se.fit = TRUE)
-  
-  
   seili_temp_diff <- seili_test_diff %>%
     mutate(bga_diff_pred = preds$fit)
   
@@ -417,33 +424,6 @@ for(k in 1:k_max){
 
 
 
-
-
-
-# seili_res_diff_plot <- seili_res_diff %>%
-#   select(day, year, depth, chl_diff, chl_diff_pred) %>%
-#   gather(key = var, value = value, chl_diff, chl_diff_pred) %>%
-#   mutate(var = factor(var, levels = c("chl_diff", "chl_diff_pred"), labels = c("True", "Predicted")))
-# 
-# ggplot(seili_res_diff_plot, aes(x = day, y = value)) +
-#   geom_line(aes(col = var)) +
-#   facet_wrap(. ~ depth) +
-#   coord_cartesian(ylim = c(-1, 1))
-
-# ggplot(filter(seili_work_diff, year == "2019", depth == "<20"), aes(x = day, y = chl_diff)) +
-#   geom_line() +
-#   facet_wrap(. ~ depth)
-# 
-# seili_diff_test <- seili_offset %>%
-#   filter(year == 2019, depth == "<20") %>%
-#   mutate(chl_diff = chl - lag(chl))
-# 
-# ggplot(seili_diff_test, aes(x = day, y = chl_diff)) +
-#   geom_line()
-
-
-
-
 seili_res_diff_2 <- seili_res_diff %>%
   mutate(window_between = rep(1:k_max, each = incr_days)[1:200],
          window_within = rep(1:incr_days, k_max)[1:200]) %>%
@@ -451,7 +431,7 @@ seili_res_diff_2 <- seili_res_diff %>%
   group_by(window_between) %>%
   mutate(bga_diff_pred_cumsum = cumsum(bga_sum)) %>%
   ungroup(window_between) %>%
-  select(day, year, bga, bga_diff_pred_cumsum) %>%
+  dplyr::select(day, year, bga, bga_diff_pred_cumsum) %>%
   rename(bga_pred = bga_diff_pred_cumsum)
 
 seili_res_diff_3 <- seili_res_diff_2 %>%
@@ -460,11 +440,11 @@ seili_res_diff_3 <- seili_res_diff_2 %>%
 
 seili_final_diff <- seili_2019_diff %>%
   filter(day < 15) %>%
-  select(-temp, -wind, -bga_diff) %>%
+  dplyr::select(-temp, -wind, -bga_diff) %>%
   rename(value = bga) %>%
   mutate(type = "bga") %>%
   mutate(type = factor(type, levels = c("bga", "bga_pred"), labels = c("True", "Predicted"))) %>%
-  select(day, year, type, value) %>%
+  dplyr::select(day, year, type, value) %>%
   bind_rows(seili_res_diff_3)
 
 pdf(paste0(my_folder, "/plot_predict_bga_wind.pdf"), width = 10, height = 5)
@@ -483,7 +463,7 @@ dev.off()
 
 
 
-##### "Difference-day model" for full data (not in the paper)
+##### "Difference-day model" for full data
 
 
 global_gamm_1 <- gamm(bga_diff ~ s(temp) + s(wind) + s(day),
@@ -492,7 +472,22 @@ global_gamm_1 <- gamm(bga_diff ~ s(temp) + s(wind) + s(day),
 summary(global_gamm_1)
 summary(global_gamm_1$gam)
 
-plot(1:831, resid(global_gamm_1$gam), type = "l")
+resid_1 <- residuals(global_gamm_1$gam, type = "deviance")
+
+
+# Residual plot
+pdf(paste0(my_folder, "/plot_supp_bga_diff_resid_1.pdf"), width = 7, height = 5)
+plot(resid_1, xlab = "Active days from 11/05/2011", ylab = "Residuals", main = "BGA, Difference-day model", type = "l")
+abline(h = 0)
+dev.off()
+
+# Partial autocorrelation plot for the residuals
+pdf(paste0(my_folder, "/plot_supp_bga_diff_autoc_1.pdf"), width = 7, height = 5)
+pacf(resid_1, main = "BGA, Difference-day model")
+dev.off()
+
+
+# plot(1:831, resid(global_gamm_1$gam), type = "l")
 
 ggplot(seili_work_diff, aes(x = day, y = bga_diff)) +
   geom_line(aes(colour = factor(year)), size = 1.1) +
@@ -509,7 +504,8 @@ ggplot(seili_work_diff, aes(x = day, y = bga_diff)) +
 
 
 
-###### Prediction with "Raw values model"
+
+###### Prediction with "Raw values model" (not in the paper)
 
 
 
@@ -518,8 +514,9 @@ ggplot(seili_work_diff, aes(x = day, y = bga_diff)) +
 # The model is GAMM with random year term and Gaussian response family with identity link
 # We use 2019 as a test data
 
+
 seili_work <- seili_offset %>%
-  select(day, bga, temp, wind, year) %>%
+  dplyr::select(day, bga, temp, wind, year) %>%
   mutate(year = as.factor(year)) %>%
   arrange(year, day)
 
@@ -530,7 +527,7 @@ seili_2019 <- seili_work %>%
   filter(year == 2019)
 
 day_list <- seili_2019 %>%
-  select(day) %>%
+  dplyr::select(day) %>%
   c()
 
 day_list <- day_list$day
@@ -564,6 +561,13 @@ for(k in 1:k_max){
   
   preds <- predict(gamm_1$gam, seili_test, se.fit = TRUE)
   
+  # Add the random effects manually
+  ref_year <- ranef(gamm_1$lme, level = 4)
+  rownames(ref_year) <- substr(rownames(ref_year), start = 7, stop = 10)
+  
+  preds$fit <- preds$fit + ref_year["2019", 1]
+  
+  
   # gam_1 <- gam(chl ~ s(temp, by = depth) + s(day, by = depth) + depth + year,
   #                data = seili_model, family = gaussian(link = identity))
   # 
@@ -588,7 +592,7 @@ seili_final_1 <- seili_2019 %>%
   mutate(type = factor(type, levels = c("bga", "bga_pred"), labels = c("True", "Predicted")))
 
 
-pdf(paste0(my_folder, "/plot_predict_bga_temp_wind_true_values.pdf"), width = 10, height = 5)
+pdf(paste0(my_folder, "/Revision_plots/Fig6B.pdf"), width = 10, height = 5)
 ggplot(seili_final_1, aes(x = day)) +
   geom_line(aes(y = value, linetype = type)) +
   theme_bw() +
@@ -602,17 +606,15 @@ dev.off()
 
 
 
-###### "Raw values model" prediction with no wind as predictor
+###### "Raw values model" prediction with no wind as predictor (not in the model)
 
-
-# 1. Prediction
 
 # Predictors: day (function), temp (function)
 # The model is GAMM with random year term and Gaussian response family with identity link
 # We use 2019 as a test data
 
 seili_work <- seili_offset %>%
-  select(day, bga, temp, year) %>%
+  dplyr::select(day, bga, temp, year) %>%
   mutate(year = as.factor(year)) %>%
   arrange(year, day)
 
@@ -623,7 +625,7 @@ seili_2019 <- seili_work %>%
   filter(year == 2019)
 
 day_list <- seili_2019 %>%
-  select(day) %>%
+  dplyr::select(day) %>%
   c()
 
 day_list <- day_list$day
@@ -697,11 +699,12 @@ dev.off()
 
 ##### "Raw values model" for full data
 
-
 global_gamm_1 <- gamm(bga ~ s(temp) + s(wind) + s(day),
                       random = list(year = ~1), data = seili_work, family = gaussian(link = identity), method = "REML", niterPQL = 100)
 
 summary(global_gamm_1)
 summary(global_gamm_1$gam)
 
-
+resid_1 <- residuals(global_gamm_1$gam, type = "deviance")
+plot(resid_1)
+pacf(resid_1)

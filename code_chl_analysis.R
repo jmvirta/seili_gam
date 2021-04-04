@@ -1,7 +1,7 @@
 #-----------------
 #
 # Chlorophyll analyses
-# 09.12.2020
+# 04.04.2021
 # JV
 # jomivi(at)utu.fi
 #
@@ -38,15 +38,15 @@ my_folder <- "/folder/subfolder"
 chl <- NULL
 
 for(i in 2011:2019){
-  chl_temp <- read.csv(paste0(my_folder, "/chl_", i, ".csv")) %>%
-    select(-type) %>%
+  chl_temp <- read.csv(paste0(my_folder, "\\chl_", i, ".csv")) %>%
+    dplyr::select(-type) %>%
     mutate(depth = if_else(depth < 20, 1, 2)) %>%
     mutate(date = as.Date(substr(date, 1, 10))) %>%
     group_by(date, depth) %>%
     summarise(chl = mean(value, na.rm = TRUE)) %>%
     ungroup() %>%
     mutate(year = year(date), day = yday(date)) %>%
-    select(year, day, depth, chl)
+    dplyr::select(year, day, depth, chl)
   
   chl <- chl %>%
     bind_rows(chl_temp)
@@ -56,15 +56,15 @@ for(i in 2011:2019){
 temp <- NULL
 
 for(i in 2011:2019){
-  temp_temp <- read.csv(paste0(my_folder, "/temperature_", i, ".csv")) %>%
-    select(-type) %>%
+  temp_temp <- read.csv(paste0(my_folder, "\\temperature_", i, ".csv")) %>%
+    dplyr::select(-type) %>%
     mutate(depth = if_else(depth < 20, 1, 2)) %>%
     mutate(date = as.Date(substr(date, 1, 10))) %>%
     group_by(date, depth) %>%
     summarise(temp = mean(value, na.rm = TRUE)) %>%
     ungroup() %>%
     mutate(year = year(date), day = yday(date)) %>%
-    select(year, day, depth, temp)
+    dplyr::select(year, day, depth, temp)
   
   temp <- temp %>%
     bind_rows(temp_temp)
@@ -100,11 +100,11 @@ ggplot(filter(seili, year == "2019"), aes(x = day, y = chl)) +
 
 # We align the data by the dates with maximal yearly surface Chl-value
 seili %>%
-  select(day, year, chl, depth) %>%
+  dplyr::select(day, year, chl, depth) %>%
   group_by(year, depth) %>%
   top_n(n = 1, wt = chl) %>%
   filter(depth == "<20") %>%
-  select(day)
+  dplyr::select(day)
 
 
 # 2017 starts after the spike and we use the 2016 value there
@@ -160,7 +160,7 @@ dev.off()
 # We use 2019 as a test data
 
 seili_work <- seili_offset %>%
-  select(day, chl, temp, year, depth) %>%
+  dplyr::select(day, chl, temp, year, depth) %>%
   mutate(year = as.factor(year))
 
 seili_2018 <- seili_work %>%
@@ -170,7 +170,7 @@ seili_2019 <- seili_work %>%
   filter(year == 2019)
 
 day_list <- seili_2019 %>%
-  select(day) %>%
+  dplyr::select(day) %>%
   c()
 
 day_list <- day_list$day
@@ -180,7 +180,7 @@ day_list
 
 
 
-##### 10 days ahead prediction
+##### 10 days ahead
 
 init_days <- 25
 incr_days <- 10
@@ -189,6 +189,7 @@ k_max <- 180/incr_days
 start_days <- day_list[seq(init_days + 1, by = incr_days, length.out = k_max)]
 
 seili_res <- NULL
+
 
 
 for(k in 1:k_max){
@@ -205,10 +206,16 @@ for(k in 1:k_max){
 
   preds <- predict(gamm_1$gam, seili_test, se.fit = TRUE)
   
-  # gam_1 <- gam(chl ~ s(temp, by = depth) + s(day, by = depth) + depth + year,
-  #                data = seili_model, family = gaussian(link = identity))
-  # 
-  # preds <- predict(gam_1, seili_test, se.fit = TRUE)
+  # Add the random effects manually
+  ref_year <- ranef(gamm_1$lme, level = 5)
+  rownames(ref_year) <- substr(rownames(ref_year), start = 9, stop = 12)
+  
+  preds$fit <- preds$fit + ref_year["2019", 1]
+  
+  # print(c(gamm_1$gam$smooth[[1]]$bs.dim,
+  #       gamm_1$gam$smooth[[2]]$bs.dim,
+  #       gamm_1$gam$smooth[[3]]$bs.dim,
+  #       gamm_1$gam$smooth[[4]]$bs.dim))
   
   seili_temp <- seili_test %>%
     mutate(chl_pred = preds$fit,
@@ -222,8 +229,6 @@ for(k in 1:k_max){
 
 
 
-
-
 seili_final_1 <- seili_2019 %>%
   filter(day %in% day_list[1:init_days]) %>%
   bind_rows(seili_res) %>%
@@ -233,7 +238,7 @@ seili_final_1 <- seili_2019 %>%
 
 
 
-pdf(paste0(my_folder, "/plot_predict_1.pdf"), width = 10, height = 5)
+pdf(paste0(my_folder, "/Revision_plots/Fig5A.pdf"), width = 10, height = 5)
 ggplot(filter(seili_final_1, type %in% c("True", "Predicted")), aes(x = day)) +
   geom_line(aes(y = value, linetype = type)) +
   facet_wrap(~ depth, nrow = 2) +
@@ -245,6 +250,8 @@ ggplot(filter(seili_final_1, type %in% c("True", "Predicted")), aes(x = day)) +
   # theme(plot.title = element_text(hjust = 0.5)) + 
   # theme(plot.subtitle = element_text(hjust = 0.5))
 dev.off()
+
+
 # 
 # 
 # pdf(paste0(my_folder, "/plot_predict_1_alt.pdf"), width = 10, height = 5)
@@ -267,7 +274,7 @@ dev.off()
 # 2. Prediction with "Difference-day model"
 
 seili_work_diff <- seili_offset %>%
-  select(day, chl, temp, year, depth) %>%
+  dplyr::select(day, chl, temp, year, depth) %>%
   arrange(depth, year, day) %>%
   group_by(year, depth) %>%
   mutate(chl_diff = chl - lag(chl)) %>%
@@ -283,7 +290,7 @@ seili_2019_diff <- seili_work_diff %>%
 
 day_list <- seili_2019_diff %>%
   arrange(year, day, depth) %>%
-  select(day) %>%
+  dplyr::select(day) %>%
   c()
 
 day_list <- day_list$day
@@ -317,11 +324,18 @@ for(k in 1:k_max){
 
   preds <- predict(gamm_1$gam, seili_test_diff, se.fit = TRUE)
   
-  # gam_1 <- gam(chl_diff ~ s(temp, by = depth) + s(day, by = depth) + depth + year,
-  #                data = seili_model_diff, family = gaussian(link = identity))
-  # 
-  # preds <- predict(gam_1, seili_test_diff, se.fit = TRUE)
-
+  # Add the random effects manually
+  ref_year <- ranef(gamm_1$lme, level = 5)
+  rownames(ref_year) <- substr(rownames(ref_year), start = 9, stop = 12)
+  
+  preds$fit <- preds$fit + ref_year["2019", 1]
+  
+  # print(ref_year["2019", 1])
+  
+  # print(c(gamm_1$gam$smooth[[1]]$bs.dim,
+  #       gamm_1$gam$smooth[[2]]$bs.dim,
+  #       gamm_1$gam$smooth[[3]]$bs.dim,
+  #       gamm_1$gam$smooth[[4]]$bs.dim))
   
   seili_temp_diff <- seili_test_diff %>%
     mutate(chl_diff_pred = preds$fit)
@@ -330,6 +344,365 @@ for(k in 1:k_max){
   print(k)
 }
 
+
+
+# seili_res_diff_plot <- seili_res_diff %>%
+#   select(day, year, depth, chl_diff, chl_diff_pred) %>%
+#   gather(key = var, value = value, chl_diff, chl_diff_pred) %>%
+#   mutate(var = factor(var, levels = c("chl_diff", "chl_diff_pred"), labels = c("True", "Predicted")))
+# 
+# ggplot(seili_res_diff_plot, aes(x = day, y = value)) +
+#   geom_line(aes(col = var)) +
+#   facet_wrap(. ~ depth) +
+#   coord_cartesian(ylim = c(-1, 1))
+
+# ggplot(filter(seili_work_diff, year == "2019", depth == "<20"), aes(x = day, y = chl_diff)) +
+#   geom_line() +
+#   facet_wrap(. ~ depth)
+# 
+# seili_diff_test <- seili_offset %>%
+#   filter(year == 2019, depth == "<20") %>%
+#   mutate(chl_diff = chl - lag(chl))
+# 
+# ggplot(seili_diff_test, aes(x = day, y = chl_diff)) +
+#   geom_line()
+
+
+
+
+seili_res_diff_surface <- seili_res_diff %>%
+  filter(depth == "<20") %>%
+  # mutate(chl_lag = lag(chl)) %>%
+  # slice(-1) %>%
+  mutate(window_between = rep(1:k_max, each = incr_days)[1:178],
+         window_within = rep(1:incr_days, k_max)[1:178]) %>%
+  mutate(chl_sum = ifelse(window_within == 1, chl, chl_diff_pred)) %>%
+  group_by(window_between) %>%
+  mutate(chl_diff_pred_cumsum = cumsum(chl_sum)) %>%
+  #        chl_pred = chl_lag[window_within == 1] + chl_diff_pred_cumsum) %>%
+  # mutate(chl_error = chl - chl_pred) %>%
+  ungroup(window_between) %>%
+  dplyr::select(day, year, chl, chl_diff_pred_cumsum, depth) %>%
+  rename(chl_pred = chl_diff_pred_cumsum)
+
+
+seili_res_diff_bottom <- seili_res_diff %>%
+  filter(depth == ">=20") %>%
+  # mutate(chl_lag = lag(chl)) %>%
+  # slice(-1) %>%
+  mutate(window_between = rep(1:k_max, each = incr_days)[1:178],
+         window_within = rep(1:incr_days, k_max)[1:178]) %>%
+  mutate(chl_sum = ifelse(window_within == 1, chl, chl_diff_pred)) %>%
+  group_by(window_between) %>%
+  mutate(chl_diff_pred_cumsum = cumsum(chl_sum)) %>%
+  #        chl_pred = chl_lag[window_within == 1] + chl_diff_pred_cumsum) %>%
+  # mutate(chl_error = chl - chl_pred) %>%
+  ungroup(window_between) %>%
+  dplyr::select(day, year, chl, chl_diff_pred_cumsum, depth) %>%
+  rename(chl_pred = chl_diff_pred_cumsum)
+
+
+seili_res_diff_both <- bind_rows(seili_res_diff_surface, seili_res_diff_bottom) %>%
+  gather(key = type, value = value, -day, -year, -depth) %>%
+  mutate(type = factor(type, levels = c("chl", "chl_pred"), labels = c("True", "Predicted")))
+
+seili_final_diff <- seili_2019_diff %>%
+  filter(day <= 15) %>%
+  dplyr::select(-temp, -chl_diff) %>%
+  rename(value = chl) %>%
+  mutate(type = "chl") %>%
+  mutate(type = factor(type, levels = c("chl", "chl_pred"), labels = c("True", "Predicted"))) %>%
+  dplyr::select(day, year, depth, type, value) %>%
+  bind_rows(seili_res_diff_both) %>%
+  mutate(depth = factor(depth, labels = c("Surface (<20m)", "Bottom (>=20m)")))
+
+pdf(paste0(my_folder, "/Revision_plots/Fig5B.pdf"), width = 10, height = 5)
+ggplot(seili_final_diff, aes(x = day)) +
+  geom_line(aes(y = value, linetype = type)) +
+  facet_wrap(~ depth, nrow = 2) +
+  theme_bw() +
+  # theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  labs(x = "Day", y = "Chlorophyll", linetype = "Type") +
+  geom_vline(xintercept = start_days, linetype = 2, col = "coral")
+# ggtitle("Predicting chlorophyll", subtitle = "10 days ahead at a time") +
+# theme(plot.title = element_text(hjust = 0.5)) + 
+# theme(plot.subtitle = element_text(hjust = 0.5))
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 3. Model for full data
+
+
+# k <- k_max + 1
+# 
+# seili_model <- seili_2019 %>%
+#   filter(day %in% day_list[1:(init_days + (k - 1)*incr_days)]) %>%
+#   bind_rows(seili_2018)
+
+
+gamm_1 <- gamm(chl ~ s(temp, by = depth) + s(day, by = depth) + depth,
+               random = list(year = ~1), data = seili_offset, family = gaussian(link = identity), method = "REML")
+
+# gamm_1 <- gamm(chl ~ s(temp, by = depth) + s(day, by = depth) + depth,
+#                random = list(year = ~1), data = seili_offset, family = Gamma(link = log), method = "REML")
+
+# gamm_1 <- gam(chl ~ s(temp, by = depth) + s(day, by = depth) + depth + factor(year), data = seili_offset, family = gaussian(link = identity))
+
+
+# summary(gamm_1$gam)
+
+# summary(gamm_1)
+
+# summary(gamm_1$lme)
+
+
+
+
+
+pdf(paste0(my_folder, "/plot_beta_temperature.pdf"), width = 10, height = 5)
+par(mfrow = c(1, 2))
+plot(gamm_1$gam, select = 1, scale = 0, xlab = "Temperature", ylab = "Effect on chlorophyll", main = expression("Surface, "<20 * m), rug = FALSE, se = 1.96, lwd = 2)
+grid(col = "gray")
+plot(gamm_1$gam, select = 2, scale = 0, xlab = "Temperature", ylab = "Effect on chlorophyll", main = expression("Bottom, ">=20 * m), rug = FALSE, se = 1.96, lwd = 2)
+grid(col = "gray")
+par(mfrow = c(1, 1))
+dev.off()
+
+
+pdf(paste0(my_folder, "/plot_beta_day.pdf"), width = 10, height = 5)
+par(mfrow = c(1, 2))
+plot(gamm_1$gam, select = 3, scale = 0, xlab = "Day", ylab = "Effect on chlorophyll", main = expression("Surface, "<20 * m), rug = FALSE, se = 1.96, lwd = 2)
+grid(col = "gray")
+plot(gamm_1$gam, select = 4, scale = 0, xlab = "Day", ylab = "Effect on chlorophyll", main = expression("Bottom, ">=20 * m), rug = FALSE, se = 1.96, lwd = 2)
+grid(col = "gray")
+par(mfrow = c(1, 1))
+dev.off()
+
+
+
+
+
+
+
+# 4. Diagnostics and alternative models
+
+
+# Raw values model
+
+gamm_1 <- gamm(chl ~ s(temp, by = depth) + s(day, by = depth) + depth,
+               random = list(year = ~1), data = seili_offset, family = gaussian(link = identity), method = "REML")
+
+surface_1 <- seili_offset$depth == "<20"
+
+resid_1 <- residuals(gamm_1$gam, type = "deviance")[surface_1]
+
+# Residual plot
+pdf(paste0(my_folder, "/plot_supp_chla_raw_resid_1.pdf"), width = 7, height = 5)
+plot(resid_1, xlab = "Active days from 11/05/2011", ylab = "Residuals", main = "Chl-a, Raw values model", type = "l", ylim = c(-7, 15))
+abline(h = 0)
+dev.off()
+
+# Partial autocorrelation plot for residuals
+pdf(paste0(my_folder, "/plot_supp_chla_raw_autoc_1.pdf"), width = 7, height = 5)
+pacf(resid_1, main = "Chl-a, Raw values model")
+dev.off()
+
+
+# Alternative model with temperature lag
+
+
+# seili_offset %>%
+#   select(year, day) %>%
+#   filter(year == 2011)
+
+seili_temp_lag_1 <- seili_offset %>%
+  mutate(temp_lag_1 = lag(temp, n = 1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2011 & day == -7), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2012 & day == -17), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2013 & day == -7), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2014 & day == -17), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2015 & day == -17), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2016 & day == -28), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2017 & day == 28), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2018 & day == 14), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2019 & day == -13), NA, temp_lag_1))
+
+gamm_2 <- gamm(chl ~ s(temp, by = depth) + s(temp_lag_1, by = depth) + s(day, by = depth) + depth,
+               random = list(year = ~1), data = seili_temp_lag_1, family = gaussian(link = identity), method = "REML")
+
+
+
+summary(gamm_2$gam)
+
+surface_2 <- seili_temp_lag_1$depth == "<20"
+
+resid_2 <- residuals(gamm_2$gam, type = "deviance")[surface_2]
+
+# Residual plot
+pdf(paste0(my_folder, "/plot_supp_chla_raw_resid_2.pdf"), width = 7, height = 5)
+plot(resid_2, xlab = "Active days from 11/05/2011", ylab = "Residuals", main = "Chl-a, Raw values model, temperature lag 1", type = "l", ylim = c(-7, 15))
+abline(h = 0)
+dev.off()
+
+# Partial autocorrelation plot for residuals
+pdf(paste0(my_folder, "/plot_supp_chla_raw_autoc_2.pdf"), width = 7, height = 5)
+pacf(resid_2, main = "Chl-a, Raw values model, temperature lag 1", na.action = na.pass)
+dev.off()
+
+
+
+
+# Difference-day model
+
+seili_difference_day <- seili_work_diff
+
+
+gamm_diff_1 <- gamm(chl_diff ~ s(temp, by = depth) + s(day, by = depth) + depth,
+               random = list(year = ~1), data = seili_difference_day, family = gaussian(link = identity), method = "REML")
+
+summary(gamm_diff_1$gam)
+
+surface_diff_1 <- seili_difference_day$depth == "<20"
+
+resid_diff_1 <- residuals(gamm_diff_1$gam, type = "deviance")[surface_diff_1]
+
+# Residual plot
+pdf(paste0(my_folder, "/plot_supp_chla_diff_resid_1.pdf"), width = 7, height = 5)
+plot(resid_diff_1, xlab = "Active days from 11/05/2011", ylab = "Residuals", main = "Chl-a, Difference-day model", type = "l", ylim = c(-7, 15))
+abline(h = 0)
+dev.off()
+
+# Partial autocorrelation plot for residuals
+pdf(paste0(my_folder, "/plot_supp_chla_diff_autoc_1.pdf"), width = 7, height = 5)
+pacf(resid_diff_1, main = "Chl-a, Difference-day model")
+dev.off()
+
+#
+
+
+
+# Difference-day model with lagged temperature
+
+seili_diff_temp_lag_1 <- seili_difference_day %>%
+  mutate(temp_lag_1 = lag(temp, n = 1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2011 & day == -7), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2012 & day == -17), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2013 & day == -7), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2014 & day == -17), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2015 & day == -17), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2016 & day == -28), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2017 & day == 28), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2018 & day == 14), NA, temp_lag_1)) %>%
+  mutate(temp_lag_1 = ifelse((year == 2019 & day == -13), NA, temp_lag_1))
+
+
+
+gamm_diff_2 <- gamm(chl_diff ~ s(temp, by = depth) + s(temp_lag_1, by = depth) + s(day, by = depth) + depth,
+                    random = list(year = ~1), data = seili_diff_temp_lag_1, family = gaussian(link = identity), method = "REML")
+
+summary(gamm_diff_2$gam)
+
+surface_diff_2 <- seili_diff_temp_lag_1$depth == "<20"
+
+resid_diff_2 <- residuals(gamm_diff_2$gam, type = "deviance")[surface_diff_2]
+
+# Residual plot
+pdf(paste0(my_folder, "/plot_supp_chla_diff_resid_2.pdf"), width = 7, height = 5)
+plot(resid_diff_2, xlab = "Active days from 11/05/2011", ylab = "Residuals", main = "Chl-a, Difference-day model, temperature lag 1", type = "l", ylim = c(-7, 15))
+abline(h = 0)
+dev.off()
+
+# Partial autocorrelation plot for residuals
+pdf(paste0(my_folder, "/plot_supp_chla_diff_autoc_2.pdf"), width = 7, height = 5)
+pacf(resid_diff_2, main = "Chl-a, Difference-day model, temperature lag 1")
+dev.off()
+
+
+
+
+
+# 5. Prediction with difference-day model and lagged temperature
+
+seili_work_diff <- seili_diff_temp_lag_1
+
+seili_2018_diff <- seili_work_diff %>%
+  filter(year %in% 2011:2018)
+
+seili_2019_diff <- seili_work_diff %>%
+  filter(year == 2019)
+
+day_list <- seili_2019_diff %>%
+  arrange(year, day, depth) %>%
+  dplyr::select(day) %>%
+  c()
+
+day_list <- day_list$day
+day_list <- day_list[seq(1, length(day_list), 2)]
+
+
+
+
+##### 10 days ahead
+
+init_days <- 25
+incr_days <- 10
+k_max <- 180/incr_days
+
+start_days <- day_list[seq(init_days + 1, by = incr_days, length.out = k_max)]
+
+seili_res_diff <- NULL
+
+
+for(k in 1:k_max){
+  
+  seili_model_diff <- seili_2019_diff %>%
+    filter(day %in% day_list[1:(init_days + (k - 1)*incr_days)]) %>%
+    bind_rows(seili_2018_diff)
+  
+  seili_test_diff <- seili_2019_diff %>%
+    filter(day %in% day_list[(init_days + (k - 1)*incr_days + 1):(init_days + k*incr_days)])
+  
+  gamm_1 <- gamm(chl_diff ~ s(temp, by = depth) + s(temp_lag_1, by = depth) + s(day, by = depth) + depth,
+                 random = list(year = ~1), data = seili_model_diff, family = gaussian(link = identity), method = "REML", niterPQL = 100)
+  
+  preds <- predict(gamm_1$gam, seili_test_diff, se.fit = TRUE)
+  
+  # Add the random effects manually
+  ref_year <- ranef(gamm_1$lme, level = 7)
+  rownames(ref_year) <- substr(rownames(ref_year), start = 13, stop = 16)
+  
+  preds$fit <- preds$fit + ref_year["2019", 1]
+  
+  # print(ref_year["2019", 1])
+  
+  # print(c(gamm_1$gam$smooth[[1]]$bs.dim,
+  #       gamm_1$gam$smooth[[2]]$bs.dim,
+  #       gamm_1$gam$smooth[[3]]$bs.dim,
+  #       gamm_1$gam$smooth[[4]]$bs.dim))
+  
+  # gam_1 <- gam(chl_diff ~ s(temp, by = depth) + s(day, by = depth) + depth + year,
+  #                data = seili_model_diff, family = gaussian(link = identity))
+  # 
+  # preds <- predict(gam_1, seili_test_diff, se.fit = TRUE)
+  
+  
+  seili_temp_diff <- seili_test_diff %>%
+    mutate(chl_diff_pred = preds$fit)
+  
+  seili_res_diff <- bind_rows(seili_res_diff, seili_temp_diff)
+  print(k)
+}
 
 
 
@@ -373,7 +746,7 @@ seili_res_diff_surface <- seili_res_diff %>%
   #        chl_pred = chl_lag[window_within == 1] + chl_diff_pred_cumsum) %>%
   # mutate(chl_error = chl - chl_pred) %>%
   ungroup(window_between) %>%
-  select(day, year, chl, chl_diff_pred_cumsum, depth) %>%
+  dplyr::select(day, year, chl, chl_diff_pred_cumsum, depth) %>%
   rename(chl_pred = chl_diff_pred_cumsum)
 
 
@@ -389,7 +762,7 @@ seili_res_diff_bottom <- seili_res_diff %>%
   #        chl_pred = chl_lag[window_within == 1] + chl_diff_pred_cumsum) %>%
   # mutate(chl_error = chl - chl_pred) %>%
   ungroup(window_between) %>%
-  select(day, year, chl, chl_diff_pred_cumsum, depth) %>%
+  dplyr::select(day, year, chl, chl_diff_pred_cumsum, depth) %>%
   rename(chl_pred = chl_diff_pred_cumsum)
 
 
@@ -399,15 +772,15 @@ seili_res_diff_both <- bind_rows(seili_res_diff_surface, seili_res_diff_bottom) 
 
 seili_final_diff <- seili_2019_diff %>%
   filter(day <= 15) %>%
-  select(-temp, -chl_diff) %>%
+  dplyr::select(-temp, -chl_diff) %>%
   rename(value = chl) %>%
   mutate(type = "chl") %>%
   mutate(type = factor(type, levels = c("chl", "chl_pred"), labels = c("True", "Predicted"))) %>%
-  select(day, year, depth, type, value) %>%
+  dplyr::select(day, year, depth, type, value) %>%
   bind_rows(seili_res_diff_both) %>%
   mutate(depth = factor(depth, labels = c("Surface (<20m)", "Bottom (>=20m)")))
 
-pdf(paste0(my_folder, "/plot_predict_2.pdf"), width = 10, height = 5)
+pdf(paste0(my_folder, "/plot_supp_chla_diff_pred_2.pdf"), width = 10, height = 5)
 ggplot(seili_final_diff, aes(x = day)) +
   geom_line(aes(y = value, linetype = type)) +
   facet_wrap(~ depth, nrow = 2) +
@@ -424,55 +797,6 @@ dev.off()
 
 
 
-
-
-
-
-
-
-
-
-# 3. Model for full data
-
-
-# k <- k_max + 1
-# 
-# seili_model <- seili_2019 %>%
-#   filter(day %in% day_list[1:(init_days + (k - 1)*incr_days)]) %>%
-#   bind_rows(seili_2018)
-
-
-gamm_1 <- gamm(chl ~ s(temp, by = depth) + s(day, by = depth) + depth,
-               random = list(year = ~1), data = seili_offset, family = gaussian(link = identity), method = "REML")
-
-# gamm_1 <- gam(chl ~ s(temp, by = depth) + s(day, by = depth) + depth + factor(year), data = seili_offset, family = gaussian(link = identity))
-
-
-summary(gamm_1$gam)
-
-summary(gamm_1)
-
-summary(gamm_1$lme)
-
-
-pdf(paste0(my_folder, "/plot_beta_temperature.pdf"), width = 10, height = 5)
-par(mfrow = c(1, 2))
-plot(gamm_1$gam, select = 1, scale = 0, xlab = "Temperature", ylab = "Effect on chlorophyll", main = expression("Surface, "<20 * m), rug = FALSE, se = 1.96, lwd = 2)
-grid(col = "gray")
-plot(gamm_1$gam, select = 2, scale = 0, xlab = "Temperature", ylab = "Effect on chlorophyll", main = expression("Bottom, ">=20 * m), rug = FALSE, se = 1.96, lwd = 2)
-grid(col = "gray")
-par(mfrow = c(1, 1))
-dev.off()
-
-
-pdf(paste0(my_folder, "/plot_beta_day.pdf"), width = 10, height = 5)
-par(mfrow = c(1, 2))
-plot(gamm_1$gam, select = 3, scale = 0, xlab = "Day", ylab = "Effect on chlorophyll", main = expression("Surface, "<20 * m), rug = FALSE, se = 1.96, lwd = 2)
-grid(col = "gray")
-plot(gamm_1$gam, select = 4, scale = 0, xlab = "Day", ylab = "Effect on chlorophyll", main = expression("Bottom, ">=20 * m), rug = FALSE, se = 1.96, lwd = 2)
-grid(col = "gray")
-par(mfrow = c(1, 1))
-dev.off()
 
 
 
